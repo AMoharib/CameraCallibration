@@ -6,41 +6,18 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <androidx.camera.view.PreviewView
-        android:id="@+id/viewFinder"
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-    </androidx.camera.view.PreviewView>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
-        <TextView
-            android:id="@+id/accelerometerValue"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Hello World!" />
-        <TextView
-            android:id="@+id/gyroscopeValue"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Hello World!" />
-
-    </LinearLayout>
+    </androidx.recyclerview.widget.RecyclerView>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/captureButton"
+        android:id="@+id/addItemBtn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center"
-        android:layout_marginBottom="30dp"
-        app:backgroundTint="@color/white"
-        android:src="@drawable/camera"
-        app:tint="@null"
-        android:contentDescription="Take Picture">
-
-    </com.google.android.material.floatingactionbutton.FloatingActionButton>
-
-
+        android:layout_gravity="bottom|end"
+        android:layout_margin="10dp"/>
 </FrameLayout>

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "647408276752",
+    "project_id": "cameracallibration",
+    "storage_bucket": "cameracallibration.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:647408276752:android:67fab37057b3053bf7c195",
+        "android_client_info": {
+          "package_name": "com.example.cameracallibration"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "647408276752-m48ndk9j2dmlg705cgv44oq04bfjjohj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD65kL6VTb8homVoseaR_1GXpndbNhdSTg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "647408276752-m48ndk9j2dmlg705cgv44oq04bfjjohj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
