@@ -8,4 +8,16 @@
     <string name="login_signup_hint">Don\'t have an account? Sign Up</string>
     <string name="login_name_hint">Name</string>
     <string name="login_mobile_number_hint">Mobile Number</string>
+
+    <string-array name="airplanes">
+        <item>--</item>
+        <item>Military</item>
+        <item>Civil</item>
+    </string-array>
+
+    <string-array name="models">
+        <item>--</item>
+        <item>F16</item>
+        <item>F35</item>
+    </string-array>
 </resources>

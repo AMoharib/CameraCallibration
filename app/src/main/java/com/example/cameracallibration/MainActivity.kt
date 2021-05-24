@@ -7,6 +7,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cameracallibration.models.Item
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -27,6 +29,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var db: FirebaseFirestore
 
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -39,8 +43,6 @@ class MainActivity : AppCompatActivity() {
         linearLayout = LinearLayoutManager(this)
 
         recyclerView.layoutManager = linearLayout
-
-        getDataFromDB()
 
         addItemBtn.setOnClickListener { startActivity(Intent(this, CameraActivity::class.java)) }
     }
@@ -58,5 +60,11 @@ class MainActivity : AppCompatActivity() {
 
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        getDataFromDB()
+    }
+
 
 }

@@ -1,31 +1,36 @@
 package com.example.cameracallibration
 
 import android.Manifest
-import android.R.attr.data
-import android.content.Intent
+import android.annotation.SuppressLint
+import android.app.Dialog
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.Location
 import android.net.Uri
 import android.os.Bundle
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.Size
-import android.widget.TextView
-import android.widget.Toast
+import android.view.View
+import android.view.Window
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.lifecycle.LifecycleOwner
 import com.example.cameracallibration.extensions.toByteArray
+import com.example.cameracallibration.models.Airplane
 import com.example.cameracallibration.models.Coordinates
 import com.example.cameracallibration.models.Item
+import com.example.cameracallibration.models.ItemLocation
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -43,6 +48,9 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var sref: StorageReference
     private lateinit var auth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
+
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+
 
     private var camera: Camera? = null
     private var preview: Preview? = null
@@ -67,10 +75,20 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
     private var pitch: Float = 0.0f
     private var roll: Float = 0.0f
 
+    private lateinit var imageByteArray: ByteArray
+    private lateinit var selectedAirplane: String
+    private lateinit var selectedModel: String
+
+    private lateinit var dialog: Dialog
+
 
     companion object {
         private val REQUEST_CODE_PERMISSION = 10
-        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+        private val REQUIRED_PERMISSIONS = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,6 +103,9 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
         auth = FirebaseAuth.getInstance()
         firestore = Firebase.firestore
         sref = FirebaseStorage.getInstance().reference
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
 
         if (allPermissionGranted()) {
             viewFinder.post {
@@ -204,9 +225,10 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
         Log.d("MainActivity", "Take Photo")
         imageCapture?.takePicture(cameraExecutor,
             object : ImageCapture.OnImageCapturedCallback() {
+                @SuppressLint("UnsafeOptInUsageError")
                 override fun onCaptureSuccess(image: ImageProxy) {
-                    val byteArray: ByteArray = image.image!!.toByteArray()
-                    uploadImage(byteArray)
+                    imageByteArray = image.image!!.toByteArray()
+                    showDialog()
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -241,39 +263,124 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
 //            })
     }
 
-    private fun uploadImage(byteArray: ByteArray) {
+    @SuppressLint("MissingPermission")
+    private fun uploadImage() {
 
-        val ref = sref.child("media/${System.currentTimeMillis()}.jpg")
-        val uploadTask: UploadTask = ref.putBytes(byteArray)
-        uploadTask.continueWithTask { task ->
-            if (!task.isSuccessful) {
-                task.exception?.let {
-                    throw it
+
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location: Location? ->
+                val ref = sref.child("media/${System.currentTimeMillis()}.jpg")
+                val uploadTask: UploadTask = ref.putBytes(imageByteArray)
+                uploadTask.continueWithTask { task ->
+                    if (!task.isSuccessful) {
+                        task.exception?.let {
+                            throw it
+                        }
+                    }
+                    ref.downloadUrl
+                }.addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val downloadUri = task.result
+                        saveData(downloadUri, location)
+                    } else {
+                        // Handle failures
+                        // ...
+                    }
                 }
             }
-            ref.downloadUrl
-        }.addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val downloadUri = task.result
-                saveData(downloadUri)
-            } else {
-                // Handle failures
-                // ...
-            }
-        }
+
+
     }
 
-    private fun saveData(imageUri: Uri?){
+    private fun saveData(imageUri: Uri?, location: Location?) {
         val userId = auth.currentUser?.uid
         val coordinates = Coordinates(pitch, roll, azimuth)
-        val item = Item(coordinates, imageUri.toString(), userId)
+        val itemLocation = ItemLocation(location?.latitude, location?.longitude)
+        val airplane = Airplane(selectedAirplane, selectedModel)
+        val item = Item(coordinates, imageUri.toString(), userId, itemLocation, airplane)
 
         firestore.collection("items").add(item).addOnCompleteListener {
-            if(it.isSuccessful) {
+            if (it.isSuccessful) {
+                dialog.dismiss()
                 onBackPressed()
             }
         }
 
+
+    }
+
+    private fun showDialog() {
+        dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setCancelable(false)
+        dialog.setContentView(R.layout.dialog)
+        val window: Window? = dialog.window
+        window?.setLayout(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        val loading = dialog.findViewById(R.id.loading) as LinearLayout
+        val airplanesSpinner = dialog.findViewById(R.id.planes_spinner) as Spinner
+        val modelsSpinner = dialog.findViewById(R.id.models_spinner) as Spinner
+
+
+        val airplanes = resources.getStringArray(R.array.airplanes)
+        val models = resources.getStringArray(R.array.models)
+
+        selectedAirplane = airplanes[0]
+        selectedModel = models[0]
+
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.airplanes,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            // Specify the layout to use when the list of choices appears
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            // Apply the adapter to the spinner
+            airplanesSpinner.adapter = adapter
+        }
+
+        airplanesSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+                selectedAirplane = airplanes[p2]
+                modelsSpinner.visibility =
+                    if (selectedAirplane == "Military") View.VISIBLE else View.GONE
+            }
+
+            override fun onNothingSelected(p0: AdapterView<*>?) {
+            }
+
+        }
+
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.models,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            // Specify the layout to use when the list of choices appears
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            // Apply the adapter to the spinner
+            modelsSpinner.adapter = adapter
+        }
+
+        modelsSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+                selectedModel = models[p2]
+            }
+
+            override fun onNothingSelected(p0: AdapterView<*>?) {
+            }
+        }
+
+        val uploadBtn = dialog.findViewById(R.id.uploadBtn) as Button
+        val closeBtn = dialog.findViewById(R.id.closeBtn) as Button
+        uploadBtn.setOnClickListener {
+            uploadImage()
+            loading.visibility = View.VISIBLE
+        }
+        closeBtn.setOnClickListener { dialog.dismiss() }
+        dialog.show()
 
     }
 
