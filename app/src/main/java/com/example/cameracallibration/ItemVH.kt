@@ -7,6 +7,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cameracallibration.models.Item
 import com.squareup.picasso.Picasso
+import java.text.SimpleDateFormat
+import java.util.*
 
 class ItemVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
     private var coordinates: TextView = itemView.findViewById(R.id.coordinates)
@@ -23,21 +25,26 @@ class ItemVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
     fun bindView(item: Item) {
         this.item = item
-        coordinates.text = "X: ${
-            item.coordinates?.x?.toDouble()?.let { Math.toDegrees(it).toInt() }
-        }\t\t\t Y: ${
-            item.coordinates?.y?.toDouble()?.let { Math.toDegrees(it).toInt() }
-        }\t\t\t Z: ${
-            item.coordinates?.z?.toDouble()?.let { ((Math.toDegrees(it) + 360) % 360).toInt() }
-        }\n Lat: ${
-            item.location?.lat
-        }\t\t\t Long: ${
-            item.location?.long
-        }\n Type: ${
-            item.airplane?.type
-        }\t\t\t Model: ${
-            item.airplane?.model
-        }"
+        coordinates.text =
+            "Azimuth: ${
+                item.coordinates?.azimuth?.toDouble()
+                    ?.let { ((Math.toDegrees(it) + 360) % 360).toInt() }
+            }°\t\t\t Inclination: ${
+                item.coordinates?.roll?.toDouble()
+                    ?.let { ((Math.toDegrees(it) + 360) % 360).toInt() }
+            }°\n Lat: ${
+                item.location?.lat
+            }\t\t\t Long: ${
+                item.location?.long
+            }\n Unit Name: ${
+                item.unitName
+            }\t\t\t Quantity: ${
+                item.quantity
+            }\t\t\t Type: ${
+                item.airplane
+            }\n Time: ${
+                SimpleDateFormat("hh:mm:ss aa").format(item.time)
+            }"
         Picasso.get().load(item.imageUri).into(image)
     }
 }

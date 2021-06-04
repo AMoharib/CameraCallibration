@@ -1,11 +1,15 @@
 package com.example.cameracallibration
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.droidnet.DroidNet
 import com.example.cameracallibration.models.Item
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -23,6 +27,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var linearLayout: LinearLayoutManager
+    private lateinit var gridLayout: GridLayoutManager
 
     private lateinit var auth: FirebaseAuth
     private lateinit var items: ArrayList<Item>
@@ -40,9 +45,16 @@ class MainActivity : AppCompatActivity() {
 
         addItemBtn = findViewById(R.id.addItemBtn)
         recyclerView = findViewById(R.id.recyclerView)
-        linearLayout = LinearLayoutManager(this)
 
-        recyclerView.layoutManager = linearLayout
+        val orientation = resources.configuration.orientation
+        if(orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            gridLayout = GridLayoutManager(this, 2)
+            recyclerView.layoutManager = gridLayout
+        } else {
+            linearLayout = LinearLayoutManager(this)
+            recyclerView.layoutManager = linearLayout
+        }
+
 
         addItemBtn.setOnClickListener { startActivity(Intent(this, CameraActivity::class.java)) }
     }
@@ -65,6 +77,5 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         getDataFromDB()
     }
-
 
 }

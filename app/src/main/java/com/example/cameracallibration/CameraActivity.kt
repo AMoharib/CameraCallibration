@@ -2,7 +2,6 @@ package com.example.cameracallibration
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.Dialog
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -11,11 +10,12 @@ import android.hardware.SensorManager
 import android.location.Location
 import android.net.Uri
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.Size
+import android.view.Surface
 import android.view.View
-import android.view.Window
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -24,14 +24,15 @@ import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.droidnet.DroidListener
+import com.droidnet.DroidNet
+import com.example.cameracallibration.extensions.toBitmap
 import com.example.cameracallibration.extensions.toByteArray
-import com.example.cameracallibration.models.Airplane
 import com.example.cameracallibration.models.Coordinates
 import com.example.cameracallibration.models.Item
 import com.example.cameracallibration.models.ItemLocation
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
@@ -40,10 +41,12 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageReference
 import com.google.firebase.storage.UploadTask
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.Executor
 
 
-class CameraActivity : AppCompatActivity(), SensorEventListener {
+class CameraActivity : AppCompatActivity(), SensorEventListener, DroidListener {
 
     private lateinit var sref: StorageReference
     private lateinit var auth: FirebaseAuth
@@ -56,7 +59,6 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
     private var preview: Preview? = null
     private var imageCapture: ImageCapture? = null
     private lateinit var viewFinder: PreviewView
-    private lateinit var captureButton: FloatingActionButton
 
     private var displayId: Int = -1
     private var lensFacing: Int = CameraSelector.LENS_FACING_BACK
@@ -66,7 +68,32 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var mSensorManger: SensorManager
     private lateinit var mAccelerometer: Sensor
     private lateinit var mGyroscope: Sensor
-    private lateinit var gyroscopeValue: TextView
+
+    // Views
+    private lateinit var latText: TextView
+    private lateinit var longText: TextView
+    private lateinit var timeText: TextView
+    private lateinit var azimuthText: TextView
+    private lateinit var incText: TextView
+
+
+    private lateinit var unitsSpinner: Spinner
+    private lateinit var quantitySpinner: Spinner
+    private lateinit var planesSpinner: Spinner
+
+    private lateinit var captureButton: Button
+    private lateinit var loading: ProgressBar
+
+    private lateinit var imagePreview: ImageView
+    private lateinit var greenLight: ImageView
+    private lateinit var redLight: ImageView
+
+    // Location
+    private lateinit var currentLocation: Location
+
+    // Connectivity
+    private lateinit var mDroidNet: DroidNet
+
 
     private var mGravity: FloatArray = FloatArray(9) { 0f }
     private var mGeomagnetic: FloatArray = FloatArray(9) { 0f }
@@ -77,9 +104,8 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var imageByteArray: ByteArray
     private lateinit var selectedAirplane: String
-    private lateinit var selectedModel: String
-
-    private lateinit var dialog: Dialog
+    private lateinit var selectedUnit: String
+    private lateinit var selectedQuantity: String
 
 
     companion object {
@@ -94,17 +120,50 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_camera)
+        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE
+                // Set the content to appear under the system bars so that the
+                // content doesn't resize when the system bars hide and show.
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                // Hide the nav bar and status bar
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_FULLSCREEN)
 
+        DroidNet.init(this)
 
+        // Views
         viewFinder = findViewById(R.id.viewFinder)
-        gyroscopeValue = findViewById(R.id.gyroscopeValue)
+        imagePreview = findViewById(R.id.ivPreview)
+
+        latText = findViewById(R.id.latText)
+        longText = findViewById(R.id.longText)
+        timeText = findViewById(R.id.timeText)
+        azimuthText = findViewById(R.id.azimuthText)
+        incText = findViewById(R.id.incText)
+
+        unitsSpinner = findViewById(R.id.units_spinner)
+        quantitySpinner = findViewById(R.id.quantity_spinner)
+        planesSpinner = findViewById(R.id.planes_spinner)
+
+        greenLight = findViewById(R.id.greenLight)
+        redLight = findViewById(R.id.redLight)
+
         captureButton = findViewById(R.id.captureButton)
 
+        loading = findViewById(R.id.loading)
+
+        // Firebase
         auth = FirebaseAuth.getInstance()
         firestore = Firebase.firestore
         sref = FirebaseStorage.getInstance().reference
 
+        // Location
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
+        // Connectivity
+        mDroidNet = DroidNet.getInstance();
+        mDroidNet.addInternetConnectivityListener(this);
 
 
         if (allPermissionGranted()) {
@@ -125,25 +184,147 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
         mAccelerometer = mSensorManger.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         mGyroscope = mSensorManger.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
+
         registerSensors()
-        captureButton.setOnClickListener { takePhoto() }
+        setupTimer()
+        setupSpinners()
+        getCurrentLocation()
+
+        captureButton.setOnClickListener {
+            loading.visibility = View.VISIBLE
+            takePhoto()
+        }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        if (requestCode == REQUEST_CODE_PERMISSION) {
-            if (allPermissionGranted()) {
-                startCameraCapture()
-                startCamera()
+    private fun setupTimer() {
+        val timer = Timer()
+        timer.scheduleAtFixedRate(object : TimerTask() {
+            override fun run() {
+                runOnUiThread {
+                    timeText.text = "${SimpleDateFormat("hh:mm:ss aa").format(Date())}"
+                }
+            }
+        }, 0, 1000)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun getCurrentLocation() {
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location: Location? ->
+                if (location != null) {
+                    currentLocation = location
+                }
+                latText.text = "Lat: ${location?.latitude}"
+                longText.text = "Long: ${location?.longitude}"
+            }
+    }
+
+    private fun saveData(imageUri: Uri?, location: Location?) {
+        val userId = auth.currentUser?.uid
+        val coordinates = Coordinates(pitch, roll, azimuth)
+        val itemLocation = ItemLocation(location?.latitude, location?.longitude)
+        val item = Item(coordinates, imageUri.toString(), userId, selectedUnit, selectedQuantity, selectedAirplane, itemLocation, System.currentTimeMillis())
+
+        firestore.collection("items").add(item).addOnCompleteListener {
+            if (it.isSuccessful) {
+                loading.visibility = View.GONE
+                onBackPressed()
+            }
+        }
+
+
+    }
+
+    private fun setupSpinners() {
+
+        val airplanes = resources.getStringArray(R.array.airplanes)
+        val units = resources.getStringArray(R.array.unit)
+        val quantities = resources.getStringArray(R.array.quantity)
+
+        selectedAirplane = airplanes[0]
+        selectedUnit = units[0]
+        selectedQuantity = quantities[0]
+
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.airplanes,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            // Specify the layout to use when the list of choices appears
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            // Apply the adapter to the spinner
+            planesSpinner.adapter = adapter
+        }
+
+        planesSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+                selectedAirplane = airplanes[p2]
+            }
+
+            override fun onNothingSelected(p0: AdapterView<*>?) {
+            }
+
+        }
+
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.unit,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            // Specify the layout to use when the list of choices appears
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            // Apply the adapter to the spinner
+            unitsSpinner.adapter = adapter
+        }
+
+        unitsSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+                selectedUnit = units[p2]
+            }
+
+            override fun onNothingSelected(p0: AdapterView<*>?) {
+            }
+        }
+
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.quantity,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            // Specify the layout to use when the list of choices appears
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            // Apply the adapter to the spinner
+            quantitySpinner.adapter = adapter
+        }
+
+        quantitySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+                selectedQuantity = units[p2]
+            }
+
+            override fun onNothingSelected(p0: AdapterView<*>?) {
+            }
+        }
+    }
+
+    private fun uploadImage() {
+
+        val ref = sref.child("media/${System.currentTimeMillis()}.jpg")
+        val uploadTask: UploadTask = ref.putBytes(imageByteArray)
+        uploadTask.continueWithTask { task ->
+            if (!task.isSuccessful) {
+                task.exception?.let {
+                    throw it
+                }
+            }
+            ref.downloadUrl
+        }.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val downloadUri = task.result
+                saveData(downloadUri, currentLocation)
             } else {
-                Toast.makeText(
-                    this,
-                    "Permission not granted by user",
-                    Toast.LENGTH_LONG
-                ).show()
+                // Handle failures
+                // ...
             }
         }
     }
@@ -181,8 +362,6 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
     private fun startCameraCapture() {
 
         try {
-
-
             // SETUP CAPTURE MODE
             // to optimize photo capture for quality
             val captureMode = ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
@@ -209,6 +388,7 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
                 .setFlashMode(flashMode)
                 .setTargetResolution(screenSize)
                 .setTargetName("CameraConference")
+                .setTargetRotation(Surface.ROTATION_0)
                 .build()
         } catch (exc: Exception) {
             Log.d("MainActivity", exc.message)
@@ -228,7 +408,12 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
                 @SuppressLint("UnsafeOptInUsageError")
                 override fun onCaptureSuccess(image: ImageProxy) {
                     imageByteArray = image.image!!.toByteArray()
-                    showDialog()
+                    viewFinder.visibility = View.GONE
+
+                    imagePreview.setImageBitmap(image.toBitmap())
+                    imagePreview.visibility = View.VISIBLE
+
+                    uploadImage()
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -261,131 +446,6 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
 //                    ).show()
 //                }
 //            })
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun uploadImage() {
-
-
-        fusedLocationClient.lastLocation
-            .addOnSuccessListener { location: Location? ->
-                val ref = sref.child("media/${System.currentTimeMillis()}.jpg")
-                val uploadTask: UploadTask = ref.putBytes(imageByteArray)
-                uploadTask.continueWithTask { task ->
-                    if (!task.isSuccessful) {
-                        task.exception?.let {
-                            throw it
-                        }
-                    }
-                    ref.downloadUrl
-                }.addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        val downloadUri = task.result
-                        saveData(downloadUri, location)
-                    } else {
-                        // Handle failures
-                        // ...
-                    }
-                }
-            }
-
-
-    }
-
-    private fun saveData(imageUri: Uri?, location: Location?) {
-        val userId = auth.currentUser?.uid
-        val coordinates = Coordinates(pitch, roll, azimuth)
-        val itemLocation = ItemLocation(location?.latitude, location?.longitude)
-        val airplane = Airplane(selectedAirplane, selectedModel)
-        val item = Item(coordinates, imageUri.toString(), userId, itemLocation, airplane)
-
-        firestore.collection("items").add(item).addOnCompleteListener {
-            if (it.isSuccessful) {
-                dialog.dismiss()
-                onBackPressed()
-            }
-        }
-
-
-    }
-
-    private fun showDialog() {
-        dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setCancelable(false)
-        dialog.setContentView(R.layout.dialog)
-        val window: Window? = dialog.window
-        window?.setLayout(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        val loading = dialog.findViewById(R.id.loading) as LinearLayout
-        val airplanesSpinner = dialog.findViewById(R.id.planes_spinner) as Spinner
-        val modelsSpinner = dialog.findViewById(R.id.models_spinner) as Spinner
-
-
-        val airplanes = resources.getStringArray(R.array.airplanes)
-        val models = resources.getStringArray(R.array.models)
-
-        selectedAirplane = airplanes[0]
-        selectedModel = models[0]
-
-        ArrayAdapter.createFromResource(
-            this,
-            R.array.airplanes,
-            android.R.layout.simple_spinner_item
-        ).also { adapter ->
-            // Specify the layout to use when the list of choices appears
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            // Apply the adapter to the spinner
-            airplanesSpinner.adapter = adapter
-        }
-
-        airplanesSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
-                selectedAirplane = airplanes[p2]
-                modelsSpinner.visibility =
-                    if (selectedAirplane == "Military") View.VISIBLE else View.GONE
-            }
-
-            override fun onNothingSelected(p0: AdapterView<*>?) {
-            }
-
-        }
-
-        ArrayAdapter.createFromResource(
-            this,
-            R.array.models,
-            android.R.layout.simple_spinner_item
-        ).also { adapter ->
-            // Specify the layout to use when the list of choices appears
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            // Apply the adapter to the spinner
-            modelsSpinner.adapter = adapter
-        }
-
-        modelsSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
-                selectedModel = models[p2]
-            }
-
-            override fun onNothingSelected(p0: AdapterView<*>?) {
-            }
-        }
-
-        val uploadBtn = dialog.findViewById(R.id.uploadBtn) as Button
-        val closeBtn = dialog.findViewById(R.id.closeBtn) as Button
-        uploadBtn.setOnClickListener {
-            uploadImage()
-            loading.visibility = View.VISIBLE
-        }
-        closeBtn.setOnClickListener { dialog.dismiss() }
-        dialog.show()
-
-    }
-
-    private fun allPermissionGranted() = REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun registerSensors() {
@@ -425,16 +485,59 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
                 pitch = orientation[1];
                 roll = orientation[2];
 
-                gyroscopeValue.text = "X: ${
-                    Math.toDegrees(pitch.toDouble()).toInt()
-                }\nY: ${
-                    Math.toDegrees(roll.toDouble()).toInt()
-                }\nZ: ${((Math.toDegrees(azimuth.toDouble()) + 360) % 360).toInt()}"
+                azimuthText.text = "Azimuth: ${((Math.toDegrees(azimuth.toDouble()) + 360) % 360).toInt()}°"
+                incText.text = "Inclination: ${((Math.toDegrees(roll.toDouble()) + 360) % 360).toInt()}°"
+
             }
         }
     }
 
     override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
         return
+    }
+
+    override fun onInternetConnectivityChanged(isConnected: Boolean) {
+        if(isConnected) {
+            greenLight.alpha = 1f
+            redLight.alpha = 0.2f
+        } else {
+            greenLight.alpha = 0.2f
+            redLight.alpha = 1f
+        }
+    }
+
+    private fun allPermissionGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CODE_PERMISSION) {
+            if (allPermissionGranted()) {
+                getCurrentLocation()
+                startCameraCapture()
+                startCamera()
+            } else {
+                Toast.makeText(
+                    this,
+                    "Permission not granted by user",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        DroidNet.getInstance().removeAllInternetConnectivityChangeListeners();
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mDroidNet.removeInternetConnectivityChangeListener(this);
     }
 }

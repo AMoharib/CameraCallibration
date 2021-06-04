@@ -4,8 +4,8 @@ import com.google.firebase.firestore.IgnoreExtraProperties
 
 @IgnoreExtraProperties
 class Coordinates(
-    var x: Float? = null,
-    var y: Float? = null,
-    var z: Float? = null
+    var azimuth: Float? = null,
+    var roll: Float? = null,
+    var pitch: Float? = null
 ) {
 }

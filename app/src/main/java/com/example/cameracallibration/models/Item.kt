@@ -8,7 +8,10 @@ class Item(
     var coordinates: Coordinates? = null,
     var imageUri: String? = null,
     var userId: String? = null,
+    var unitName: String? = null,
+    var quantity: String? = null,
+    var airplane: String? = null,
     var location: ItemLocation? = null,
-    var airplane: Airplane? = null
+    var time: Long? = null
 ) {
 }

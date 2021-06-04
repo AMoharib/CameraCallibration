@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -19,7 +20,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CameraCallibration">
         <activity android:name=".ImageViewer"></activity>
-        <activity android:name=".CameraActivity" />
+        <activity
+            android:name=".CameraActivity"
+            android:screenOrientation="landscape">
+
+        </activity>
 
         <provider
             android:name="androidx.core.content.FileProvider"

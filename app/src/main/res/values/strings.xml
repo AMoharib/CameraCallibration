@@ -15,9 +15,31 @@
         <item>Civil</item>
     </string-array>
 
-    <string-array name="models">
+    <string-array name="unit">
         <item>--</item>
-        <item>F16</item>
-        <item>F35</item>
+        <item>Point 1</item>
+        <item>Point 2</item>
+        <item>Point 3</item>
+        <item>Point 4</item>
+        <item>Point 5</item>
+        <item>Point 6</item>
+        <item>Point 7</item>
+        <item>Point 8</item>
+        <item>Point 9</item>
+        <item>Point 10</item>
+    </string-array>
+
+    <string-array name="quantity">
+        <item>--</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
     </string-array>
 </resources>
