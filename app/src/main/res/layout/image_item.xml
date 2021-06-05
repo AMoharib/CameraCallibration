@@ -31,6 +31,13 @@
                 android:padding="8dp"/>
 
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
 
+        <ImageButton
+            android:id="@+id/deleteBtn"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="end"
+            android:layout_margin="8dp"
+            android:background="@drawable/delete" />
+    </androidx.cardview.widget.CardView>
 </FrameLayout>

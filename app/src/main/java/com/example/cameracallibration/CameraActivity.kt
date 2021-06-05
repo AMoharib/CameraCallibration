@@ -201,7 +201,7 @@ class CameraActivity : AppCompatActivity(), SensorEventListener, DroidListener {
         timer.scheduleAtFixedRate(object : TimerTask() {
             override fun run() {
                 runOnUiThread {
-                    timeText.text = "${SimpleDateFormat("hh:mm:ss aa").format(Date())}"
+                    timeText.text = "${SimpleDateFormat("dd-MMM-yyyy").format(Date())}\n${SimpleDateFormat("hh:mm:ss aa").format(Date())}"
                 }
             }
         }, 0, 1000)
@@ -299,7 +299,7 @@ class CameraActivity : AppCompatActivity(), SensorEventListener, DroidListener {
 
         quantitySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
-                selectedQuantity = units[p2]
+                selectedQuantity = quantities[p2]
             }
 
             override fun onNothingSelected(p0: AdapterView<*>?) {

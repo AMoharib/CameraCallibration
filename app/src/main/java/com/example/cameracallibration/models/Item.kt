@@ -12,6 +12,7 @@ class Item(
     var quantity: String? = null,
     var airplane: String? = null,
     var location: ItemLocation? = null,
-    var time: Long? = null
+    var time: Long? = null,
+    var documentId: String? = null
 ) {
 }

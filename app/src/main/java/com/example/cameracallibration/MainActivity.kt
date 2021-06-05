@@ -64,10 +64,17 @@ class MainActivity : AppCompatActivity() {
         db.collection("items").get().addOnSuccessListener { result ->
             for(document in result){
                 Log.d("MainActivity", "${document.id} => ${document.data}")
-                items.add(document.toObject<Item>())
+                val item = document.toObject<Item>()
+                item.documentId = document.id
+                items.add(item)
             }
 
-            recyclerView.adapter = RecyclerAdapter(items)
+            val adapter = RecyclerAdapter(items)
+            recyclerView.adapter = adapter
+
+            adapter.onItemDeleted = { position ->
+                adapter.notifyItemRemoved(position)
+            }
         }.addOnFailureListener {
 
         }

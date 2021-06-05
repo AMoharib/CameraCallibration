@@ -7,7 +7,7 @@ plugins {
 android {
     signingConfigs {
         release {
-            storeFile file('D:\\Porgramming\\Projects\\Freelance\\CameraCallibration\\keystore\\keystore.jks')
+            storeFile file('D:\\Programming\\Projects\\Freelance\\CameraCallibration\\keystore\\keystore.jks')
             storePassword '123456'
             keyAlias 'key0'
             keyPassword '123456'
