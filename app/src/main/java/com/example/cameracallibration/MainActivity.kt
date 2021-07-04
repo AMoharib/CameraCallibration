@@ -76,7 +76,7 @@ class MainActivity : AppCompatActivity() {
                 adapter.notifyItemRemoved(position)
             }
         }.addOnFailureListener {
-
+            Log.d("MainActivityError", it.localizedMessage)
         }
     }
 

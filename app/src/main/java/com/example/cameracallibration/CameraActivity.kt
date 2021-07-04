@@ -59,6 +59,7 @@ class CameraActivity : AppCompatActivity(), SensorEventListener, DroidListener {
     private var preview: Preview? = null
     private var imageCapture: ImageCapture? = null
     private lateinit var viewFinder: PreviewView
+    private lateinit var overlay: CameraOverlay
 
     private var displayId: Int = -1
     private var lensFacing: Int = CameraSelector.LENS_FACING_BACK
@@ -134,6 +135,7 @@ class CameraActivity : AppCompatActivity(), SensorEventListener, DroidListener {
 
         // Views
         viewFinder = findViewById(R.id.viewFinder)
+        overlay = findViewById(R.id.overlay)
         imagePreview = findViewById(R.id.ivPreview)
 
         latText = findViewById(R.id.latText)
@@ -409,6 +411,8 @@ class CameraActivity : AppCompatActivity(), SensorEventListener, DroidListener {
                 override fun onCaptureSuccess(image: ImageProxy) {
                     imageByteArray = image.image!!.toByteArray()
                     viewFinder.visibility = View.GONE
+                    overlay.visibility = View.GONE
+
 
                     imagePreview.setImageBitmap(image.toBitmap())
                     imagePreview.visibility = View.VISIBLE

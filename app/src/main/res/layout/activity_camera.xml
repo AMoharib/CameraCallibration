@@ -11,7 +11,12 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
-
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/army_drawable"
+            android:scaleType="fitXY"
+            android:alpha="0.8"/>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -159,6 +164,11 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent">
                     </androidx.camera.view.PreviewView>
+
+                    <com.example.cameracallibration.CameraOverlay
+                        android:id="@+id/overlay"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"/>
 
                     <ImageView
                         android:visibility="gone"

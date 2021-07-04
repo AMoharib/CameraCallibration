@@ -7,6 +7,12 @@
     tools:context=".MainActivity">
 
 
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/army_drawable"
+        android:scaleType="fitXY"
+        android:alpha="0.8"/>
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"
